@@ -1,8 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useQuiz } from '@/contexts/QuizContext';
+import { getChapterProgress } from '@/lib/history';
+import { getChapterQuestions } from '@/lib/questions';
 
 const CHAPTERS = [
   {
@@ -45,6 +47,36 @@ const CHAPTERS = [
 
 export default function PracticePage() {
   const { startPractice } = useQuiz();
+  const [chaptersProgress, setChaptersProgress] = useState<Record<number, any>>({});
+
+  useEffect(() => {
+    // Load progress for all chapters
+    const loadProgress = async () => {
+      const progress: Record<number, any> = {};
+
+      for (const chapter of CHAPTERS) {
+        try {
+          const chapterProgress = getChapterProgress(chapter.id);
+          const questions = getChapterQuestions(chapter.id);
+
+          progress[chapter.id] = {
+            progress: chapterProgress,
+            totalQuestions: questions.length
+          };
+        } catch (error) {
+          console.error(`Error loading progress for chapter ${chapter.id}:`, error);
+          progress[chapter.id] = {
+            progress: null,
+            totalQuestions: 0
+          };
+        }
+      }
+
+      setChaptersProgress(progress);
+    };
+
+    loadProgress();
+  }, []);
 
   const handleChapterSelect = (chapterId: number) => {
     startPractice(chapterId);
@@ -60,6 +92,7 @@ export default function PracticePage() {
           text: 'text-blue-600',
           border: 'border-blue-200',
           iconBg: 'bg-blue-100',
+          progress: 'bg-blue-600',
         };
       case 'green':
         return {
@@ -69,6 +102,7 @@ export default function PracticePage() {
           text: 'text-green-600',
           border: 'border-green-200',
           iconBg: 'bg-green-100',
+          progress: 'bg-green-600',
         };
       case 'purple':
         return {
@@ -78,6 +112,7 @@ export default function PracticePage() {
           text: 'text-purple-600',
           border: 'border-purple-200',
           iconBg: 'bg-purple-100',
+          progress: 'bg-purple-600',
         };
       default:
         return {
@@ -87,6 +122,7 @@ export default function PracticePage() {
           text: 'text-gray-600',
           border: 'border-gray-200',
           iconBg: 'bg-gray-100',
+          progress: 'bg-gray-600',
         };
     }
   };
@@ -141,13 +177,50 @@ export default function PracticePage() {
 
                 {/* Chapter Content */}
                 <div className="p-6">
+                  {/* Progress Display */}
+                  {chaptersProgress[chapter.id]?.progress && (
+                    <div className={`p-4 ${colors.light} rounded-lg mb-4`}>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-gray-700">Tiến độ</span>
+                          <span className={`font-bold ${colors.text}`}>
+                            {chaptersProgress[chapter.id].progress.totalAnswered}/{chaptersProgress[chapter.id].totalQuestions} câu
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full ${colors.progress}`}
+                            style={{
+                              width: `${(chaptersProgress[chapter.id].progress.totalAnswered / chaptersProgress[chapter.id].totalQuestions) * 100}%`
+                            }}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="flex items-center gap-1">
+                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                            <span className="text-gray-600">
+                              Đúng: {chaptersProgress[chapter.id].progress.correctAnswers}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                            <span className="text-gray-600">
+                              Sai: {chaptersProgress[chapter.id].progress.incorrectAnswers}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className={`p-4 ${colors.light} rounded-lg mb-6`}>
                     <div className="flex items-center justify-between">
-                      <span className="font-medium text-gray-700">Số câu hỏi</span>
+                      <span className="font-medium text-gray-700">Tổng số câu hỏi</span>
                       <span className={`font-bold ${colors.text}`}>
-                        {typeof chapter.questionCount === 'number'
-                          ? `${chapter.questionCount} câu`
-                          : `${chapter.questionCount} câu`}
+                        {chaptersProgress[chapter.id]?.totalQuestions ||
+                         (typeof chapter.questionCount === 'number'
+                           ? chapter.questionCount
+                           : 'Nhiều')} câu
                       </span>
                     </div>
                   </div>

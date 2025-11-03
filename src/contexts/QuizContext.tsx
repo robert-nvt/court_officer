@@ -3,9 +3,10 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { QuizState, Question, Result } from '@/lib/types';
 import { getChapterQuestions, getRandomQuestions, calculateResults } from '@/lib/questions';
+import { saveQuizResult, saveChapterProgress, getChapterProgress, clearChapterProgress } from '@/lib/history';
 
 type QuizAction =
-  | { type: 'START_QUIZ'; payload: { questions: Question[]; mode: 'practice' | 'exam'; chapter?: number } }
+  | { type: 'START_QUIZ'; payload: { questions: Question[]; mode: 'practice' | 'exam'; chapter?: number; userAnswers?: Record<string, string>; currentIndex?: number } }
   | { type: 'NEXT_QUESTION' }
   | { type: 'PREVIOUS_QUESTION' }
   | { type: 'GO_TO_QUESTION'; payload: number }
@@ -32,6 +33,8 @@ function quizReducer(state: QuizState, action: QuizAction): QuizState {
       return {
         ...initialState,
         questions: action.payload.questions,
+        currentQuestionIndex: action.payload.currentIndex || 0,
+        userAnswers: action.payload.userAnswers || {},
         mode: action.payload.mode,
         chapter: action.payload.chapter,
         timeLeft: action.payload.mode === 'exam' ? 60 * 60 : Infinity,
@@ -101,6 +104,7 @@ interface QuizContextType {
   isLastQuestion: () => boolean;
   isFirstQuestion: () => boolean;
   getProgress: () => { answered: number; total: number; percentage: number };
+  restartPractice: () => void;
 }
 
 const QuizContext = createContext<QuizContextType | undefined>(undefined);
@@ -126,7 +130,26 @@ export function QuizProvider({ children }: QuizProviderProps) {
 
   const startPractice = (chapter: number) => {
     const questions = getChapterQuestions(chapter);
-    dispatch({ type: 'START_QUIZ', payload: { questions, mode: 'practice', chapter } });
+
+    // Try to load existing progress
+    const existingProgress = getChapterProgress(chapter);
+
+    if (existingProgress) {
+      console.log('Loading existing progress for chapter', chapter, existingProgress);
+      dispatch({
+        type: 'START_QUIZ',
+        payload: {
+          questions,
+          mode: 'practice',
+          chapter,
+          userAnswers: existingProgress.userAnswers,
+          currentIndex: Math.min(existingProgress.currentIndex, questions.length - 1)
+        }
+      });
+    } else {
+      console.log('Starting fresh practice for chapter', chapter);
+      dispatch({ type: 'START_QUIZ', payload: { questions, mode: 'practice', chapter } });
+    }
   };
 
   const startExam = () => {
@@ -144,14 +167,46 @@ export function QuizProvider({ children }: QuizProviderProps) {
 
   const goToQuestion = (index: number) => {
     dispatch({ type: 'GO_TO_QUESTION', payload: index });
+
+    // Save progress for practice mode
+    if (state.mode === 'practice' && state.chapter !== undefined) {
+      setTimeout(() => {
+        saveChapterProgress(
+          state.chapter as number,
+          state.userAnswers,
+          index,
+          state.questions.length
+        );
+      }, 100);
+    }
   };
 
   const answerQuestion = (questionId: string, answer: string) => {
     dispatch({ type: 'ANSWER_QUESTION', payload: { questionId, answer } });
+
+    // Save progress for practice mode
+    if (state.mode === 'practice' && state.chapter !== undefined) {
+      setTimeout(() => {
+        saveChapterProgress(
+          state.chapter as number,
+          { ...state.userAnswers, [questionId]: answer },
+          state.currentQuestionIndex,
+          state.questions.length
+        );
+      }, 100);
+    }
   };
 
   const completeQuiz = () => {
     dispatch({ type: 'COMPLETE_QUIZ' });
+
+    // Save result to history when quiz is completed
+    setTimeout(() => {
+      const results = getResults();
+      if (results) {
+        saveQuizResult(results, state.mode, state.chapter);
+      }
+    }, 100);
   };
 
   const resetQuiz = () => {
@@ -180,6 +235,15 @@ export function QuizProvider({ children }: QuizProviderProps) {
     return { answered, total, percentage };
   };
 
+  const restartPractice = () => {
+    if (state.mode === 'practice' && state.chapter !== undefined) {
+      // Clear progress for this chapter
+      clearChapterProgress(state.chapter as number);
+      // Restart fresh
+      startPractice(state.chapter as number);
+    }
+  };
+
   const value: QuizContextType = {
     state,
     dispatch,
@@ -195,6 +259,7 @@ export function QuizProvider({ children }: QuizProviderProps) {
     isLastQuestion,
     isFirstQuestion,
     getProgress,
+    restartPractice,
   };
 
   return <QuizContext.Provider value={value}>{children}</QuizContext.Provider>;

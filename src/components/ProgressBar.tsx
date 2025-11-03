@@ -8,9 +8,20 @@ interface ProgressBarProps {
   questions: Array<{ id: string }>;
   onQuestionClick?: (index: number) => void;
   className?: string;
+  showResults?: boolean;
+  getCorrectAnswer?: (questionId: string) => string;
 }
 
-export function ProgressBar({ currentIndex, total, answered, questions, onQuestionClick, className }: ProgressBarProps) {
+export function ProgressBar({
+  currentIndex,
+  total,
+  answered,
+  questions,
+  onQuestionClick,
+  className,
+  showResults = false,
+  getCorrectAnswer
+}: ProgressBarProps) {
   const answeredCount = Object.keys(answered).length;
 
   return (
@@ -43,6 +54,8 @@ export function ProgressBar({ currentIndex, total, answered, questions, onQuesti
           const questionId = question.id;
           const isAnswered = answered[questionId];
           const isCurrent = index === currentIndex;
+          const correctAnswer = getCorrectAnswer ? getCorrectAnswer(questionId) : null;
+          const isCorrect = isAnswered && correctAnswer && isAnswered === correctAnswer;
 
           let bgClass = 'bg-gray-200'; // Default: not answered
           let borderClass = 'border-gray-200';
@@ -52,9 +65,20 @@ export function ProgressBar({ currentIndex, total, answered, questions, onQuesti
             bgClass = 'bg-yellow-400'; // Current question: yellow
             borderClass = 'border-yellow-500';
             textClass = 'text-yellow-900';
+          } else if (isAnswered && showResults && correctAnswer) {
+            // Show results: green for correct, red for incorrect
+            if (isCorrect) {
+              bgClass = 'bg-green-500';
+              borderClass = 'border-green-600';
+              textClass = 'text-white';
+            } else {
+              bgClass = 'bg-red-500';
+              borderClass = 'border-red-600';
+              textClass = 'text-white';
+            }
           } else if (isAnswered) {
-            bgClass = 'bg-green-500'; // Answered: green
-            borderClass = 'border-green-600';
+            bgClass = 'bg-blue-500'; // Answered but not showing results: blue
+            borderClass = 'border-blue-600';
             textClass = 'text-white';
           }
 
@@ -71,7 +95,15 @@ export function ProgressBar({ currentIndex, total, answered, questions, onQuesti
                   ? 'hover:scale-110 cursor-pointer hover:shadow-lg'
                   : 'cursor-default'
               )}
-              title={`Câu ${index + 1}${isAnswered ? ' (Đã trả lời)' : ''}${isCurrent ? ' (Hiện tại)' : ''}${onQuestionClick ? ' - Click để đến câu này' : ''}`}
+              title={`Câu ${index + 1}${
+                isAnswered && showResults && correctAnswer
+                  ? isCorrect
+                    ? ' (Đúng)'
+                    : ' (Sai)'
+                  : isAnswered
+                    ? ' (Đã trả lời)'
+                    : ''
+              }${isCurrent ? ' (Hiện tại)' : ''}${onQuestionClick ? ' - Click để đến câu này' : ''}`}
             >
               {index + 1}
             </button>
@@ -82,10 +114,29 @@ export function ProgressBar({ currentIndex, total, answered, questions, onQuesti
       {/* Legend */}
       <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-4 text-xs text-gray-600">
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full bg-green-500"></div>
-            <span>Đã làm</span>
-          </div>
+          {showResults ? (
+            <>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                <span>Đúng</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <span>Sai</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                <span>Đã làm</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                <span>Đã làm</span>
+              </div>
+            </>
+          )}
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
             <span>Hiện tại</span>

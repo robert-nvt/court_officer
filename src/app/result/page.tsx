@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useQuiz } from '@/contexts/QuizContext';
 import { ResultCard } from '@/components/ResultCard';
 import { AnswerGrid, QuestionModal } from '@/components/AnswerGrid';
+import { saveQuizResult } from '@/lib/history';
 
 export default function ResultPage() {
   const router = useRouter();
@@ -13,6 +14,7 @@ export default function ResultPage() {
   const [selectedAnswer, setSelectedAnswer] = useState<any>(null);
   const [selectedQuestionNumber, setSelectedQuestionNumber] = useState<number>(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     // Redirect to home if no quiz is completed
@@ -22,6 +24,15 @@ export default function ResultPage() {
   }, [state.isCompleted, router]);
 
   const result = getResults();
+
+  // Save result to history when component mounts
+  useEffect(() => {
+    if (result && !saved) {
+      console.log('Saving result to history:', { mode: state.mode, chapter: state.chapter });
+      saveQuizResult(result, state.mode, state.chapter);
+      setSaved(true);
+    }
+  }, [result, saved, state.mode, state.chapter]);
 
   if (!result) {
     return (
