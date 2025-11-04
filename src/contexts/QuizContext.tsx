@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { QuizState, Question, Result } from '@/lib/types';
-import { getChapterQuestions, getRandomQuestions, calculateResults } from '@/lib/questions';
+import { getChapterQuestions, getRandomQuestions, calculateResults, resetChapterOrder } from '@/lib/questions';
 import { saveQuizResult, saveChapterProgress, getChapterProgress, clearChapterProgress } from '@/lib/history';
 
 type QuizAction =
@@ -239,6 +239,8 @@ export function QuizProvider({ children }: QuizProviderProps) {
     if (state.mode === 'practice' && state.chapter !== undefined) {
       // Clear progress for this chapter
       clearChapterProgress(state.chapter as number);
+      // Reset shuffled order to get new random order
+      resetChapterOrder(state.chapter as number);
       // Restart fresh
       startPractice(state.chapter as number);
     }

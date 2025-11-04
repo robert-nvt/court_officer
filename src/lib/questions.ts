@@ -23,9 +23,9 @@ const ANSWERS_DATA = {
 };
 
 /**
- * Convert chapter data to Question array format
+ * Convert chapter data to Question array format (shuffled)
  */
-export function getChapterQuestions(chapter: number): Question[] {
+export function getChapterQuestions(chapter: number, shuffle: boolean = true): Question[] {
   const chapterData = CHAPTERS_DATA[chapter as keyof typeof CHAPTERS_DATA];
   if (!chapterData) {
     throw new Error(`Chapter ${chapter} not found`);
@@ -36,7 +36,7 @@ export function getChapterQuestions(chapter: number): Question[] {
     throw new Error(`Answer data for chapter ${chapter} not found`);
   }
 
-  return Object.entries(chapterData).map(([id, questionData]) => ({
+  const questions = Object.entries(chapterData).map(([id, questionData]) => ({
     id: `${chapter}-${id}`,
     question: questionData.question,
     A: questionData.A,
@@ -45,6 +45,41 @@ export function getChapterQuestions(chapter: number): Question[] {
     D: questionData.D,
     correctAnswer: answerData[id],
   }));
+
+  // Only shuffle if requested and no existing progress
+  if (shuffle) {
+    // Try to get shuffled order from localStorage to maintain consistency
+    const storageKey = `chapter_${chapter}_shuffled_order`;
+    const savedOrder = localStorage.getItem(storageKey);
+
+    if (savedOrder) {
+      try {
+        const order = JSON.parse(savedOrder);
+        // Reorder questions according to saved order
+        return order.map((index: number) => questions[index]);
+      } catch (e) {
+        console.warn('Failed to parse saved order, generating new one');
+      }
+    }
+
+    // Generate new shuffled order and save it
+    const shuffledQuestions = [...questions];
+    const order: number[] = [];
+
+    // Fisher-Yates shuffle
+    for (let i = shuffledQuestions.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffledQuestions[i], shuffledQuestions[j]] = [shuffledQuestions[j], shuffledQuestions[i]];
+    }
+
+    // Save the order
+    const indices = shuffledQuestions.map(q => questions.findIndex(qq => qq.id === q.id));
+    localStorage.setItem(storageKey, JSON.stringify(indices));
+
+    return shuffledQuestions;
+  }
+
+  return questions;
 }
 
 /**
@@ -124,6 +159,14 @@ export function calculateResults(
     timeSpent,
     answers,
   };
+}
+
+/**
+ * Reset shuffled order for a chapter (for restarting practice)
+ */
+export function resetChapterOrder(chapter: number): void {
+  const storageKey = `chapter_${chapter}_shuffled_order`;
+  localStorage.removeItem(storageKey);
 }
 
 /**
